@@ -155,8 +155,6 @@ fig1.suptitle('Популярность использования карт', fo
 plt.tight_layout()
 plt.savefig('charts_popularity_3pie.png', dpi=150)
 
-
-# --- БЛОК 2: 3 столбчатых графика процента побед (топ-10 без «Остальные», по возрастанию) ---
 def top_winrate_ascending(sub_df, top_n=10):
     # Исключаем «Остальные», берём топ-N по среднему win_rate и сортируем от меньшего к большему
     filtered = sub_df[sub_df['card_name'].str.lower() != 'остальные']
