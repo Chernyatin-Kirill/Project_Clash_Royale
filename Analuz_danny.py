@@ -2801,4 +2801,3 @@ plt.tight_layout()
 plt.savefig('royaleapi_winrate_bars.png', dpi=150)
 
 plt.show()
-print("Готово! Сохранены: royaleapi_cards_ru.csv, royaleapi_popularity_3pie.png, royaleapi_winrate_bars.png")
