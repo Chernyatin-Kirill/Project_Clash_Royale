@@ -1,7 +1,4 @@
-import re
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 raw_text = """Cannon Cart
 1
@@ -2474,28 +2471,6 @@ Win
 40%
 CWR"""
 
-lines = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]
-records = []
-i = 0
-while i + 12 < len(lines):
-    name = lines[i]
-    rank = int(lines[i + 1])
-    rating = int(lines[i + 3])
-    usage = float(lines[i + 5].replace('%', '').strip())
-    win_rate = float(lines[i + 8].replace('%', '').strip())
-    cwr = float(lines[i + 11].replace('%', '').strip())
-    records.append({
-        'rank': rank,
-        'card_en': name,
-        'rating': rating,
-        'usage': usage,
-        'win_rate': win_rate,
-        'cwr': cwr,
-    })
-    i += 13
-
-df = pd.DataFrame(records)
-
 en_to_ru = {
     'Cannon Cart': 'Повозка с пушкой',
     'Rascals': 'Разбойники',
@@ -2689,115 +2664,22 @@ en_to_ru = {
     'Royal Giant': 'Королевский гигант',
 }
 
-df['card_ru'] = df['card_en'].map(en_to_ru).fillna(df['card_en'])
+lines = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]
+records = []
+i = 0
+while i + 12 < len(lines):
+    card_en = lines[i]
+    usage = float(lines[i + 5].replace('%', '').strip())
+    win_rate = float(lines[i + 8].replace('%', '').strip())
+    records.append({
+        'card_name': en_to_ru.get(card_en, card_en),
+        'usage': usage,
+        'win_rate': win_rate,
+    })
+    i += 13
 
+df = pd.DataFrame(records)
+df.to_csv('clash_royale_stats.csv', index=False)
 
-def classify_card(name_en):
-    if name_en.startswith('Hero '):
-        return 'hero'
-    if name_en.endswith(' Evolution'):
-        return 'evolution'
-    return 'normal'
-
-
-df['category'] = df['card_en'].apply(classify_card)
-df.to_csv('royaleapi_cards_ru.csv', index=False)
-
-print(f"Всего карт: {len(df)}")
-print(df['category'].value_counts())
-
-df_heroes = df[df['category'] == 'hero']
-df_evo = df[df['category'] == 'evolution']
-df_normal = df[df['category'] == 'normal']
-
-
-def prep_usage_pie(sub_df, top_n=10):
-    s = sub_df.set_index('card_ru')['usage'].sort_values(ascending=False)
-    if len(s) > top_n:
-        top_part = s.iloc[:top_n]
-        others_sum = s.iloc[top_n:].sum()
-        s = pd.concat([top_part, pd.Series({'Остальные': others_sum})])
-    return s
-
-
-def plot_pie(ax, series, title):
-    wedges, texts, autotexts = ax.pie(
-        series.values,
-        labels=series.index,
-        autopct='%1.1f%%',
-        startangle=140,
-        pctdistance=0.76,
-        textprops={'fontsize': 8.5},
-    )
-    for autotext in autotexts:
-        autotext.set_color('white')
-        autotext.set_fontsize(8)
-        autotext.set_fontweight('bold')
-    ax.set_title(title, fontsize=11, fontweight='bold', pad=12)
-    ax.axis('equal')
-
-
-fig1, axes1 = plt.subplots(1, 3, figsize=(20, 6.8))
-plot_pie(axes1[0], prep_usage_pie(df_heroes, top_n=10), '1. Герои: популярность (топ-10 + остальные)')
-plot_pie(axes1[1], prep_usage_pie(df_evo, top_n=10), '2. Эволюции: популярность (топ-10 + остальные)')
-plot_pie(axes1[2], prep_usage_pie(df_normal, top_n=10), '3. Обычные карты: популярность (топ-10 + остальные)')
-fig1.suptitle('Популярность использования карт (данные RoyaleAPI, Ranked 7d)', fontsize=14, fontweight='bold')
-plt.tight_layout()
-plt.savefig('royaleapi_popularity_3pie.png', dpi=150)
-
-
-def prep_winrate_bars(sub_df, top_n=10):
-    top_df = sub_df.sort_values(['win_rate', 'rating', 'usage'], ascending=[False, False, False]).head(top_n)
-    top_df = top_df.sort_values(['win_rate', 'rating'], ascending=[True, True])
-    return top_df.set_index('card_ru')['win_rate']
-
-
-def plot_ascending_bars(ax, series, title, color):
-    x = np.arange(len(series))
-    bars = ax.bar(x, series.values, color=color, edgecolor='black', linewidth=0.6)
-    ax.set_xticks(x)
-    ax.set_xticklabels(series.index, rotation=32, ha='right', fontsize=9)
-    ax.set_ylabel('Процент побед (%)', fontsize=10)
-    ax.set_title(title, fontsize=11, fontweight='bold', pad=10)
-    ax.grid(axis='y', linestyle='--', alpha=0.4)
-
-    y_min = max(0.0, np.floor(series.min() - 2.0))
-    y_max = min(100.0, np.ceil(series.max() + 1.5))
-    ax.set_ylim(y_min, y_max)
-
-    for bar, val in zip(bars, series.values):
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            val + 0.15,
-            f'{val:.0f}%',
-            ha='center',
-            va='bottom',
-            fontsize=8.5,
-            fontweight='bold',
-        )
-
-
-fig2, axes2 = plt.subplots(1, 3, figsize=(20, 6.8))
-plot_ascending_bars(
-    axes2[0],
-    prep_winrate_bars(df_heroes, top_n=10),
-    '4. Герои: топ-10 по % побед (по возрастанию)',
-    color='#4C72B0',
-)
-plot_ascending_bars(
-    axes2[1],
-    prep_winrate_bars(df_evo, top_n=10),
-    '5. Эволюции: топ-10 по % побед (по возрастанию)',
-    color='#DD8452',
-)
-plot_ascending_bars(
-    axes2[2],
-    prep_winrate_bars(df_normal, top_n=10),
-    '6. Обычные карты: топ-10 по % побед (по возрастанию)',
-    color='#55A868',
-)
-fig2.suptitle('Процент побед (Win Rate) по группам карт — от меньшего к большему (RoyaleAPI)', fontsize=14, fontweight='bold')
-plt.tight_layout()
-plt.savefig('royaleapi_winrate_bars.png', dpi=150)
-
-plt.show()
+print("Файл clash_royale_stats.csv успешно создан!")
+print(df.head(10))
